@@ -1,0 +1,271 @@
+generator client {
+  provider = "prisma-client"
+  output   = "../src/generated"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+// ── Auth & Org ─────────────────────────────────────────────────────
+model Organization {
+  id                     String         @id @default(uuid())
+  name                   String
+  slug                   String         @unique
+  email                  String         @unique
+  phone                  String?
+  logoUrl                String?
+  whatsappNumber         String?
+  notifyOnPayment        Boolean        @default(true)
+  notifyDailySummary     Boolean        @default(true)
+  notifyWeeklySummary    Boolean        @default(true)
+  nombaAccountId         String?
+  createdAt              DateTime       @default(now())
+  updatedAt              DateTime       @updatedAt
+
+  users                  User[]
+  customers              Customer[]
+  invoices               Invoice[]
+  auditLogs              AuditLog[]
+  webhookEvents          WebhookEvent[]
+}
+
+model User {
+  id             String       @id @default(uuid())
+  organizationId String
+  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  name           String
+  email          String       @unique
+  passwordHash   String
+  role           UserRole     @default(VIEWER)
+  isActive       Boolean      @default(true)
+  lastLoginAt    DateTime?
+  createdAt      DateTime     @default(now())
+  updatedAt      DateTime     @updatedAt
+}
+
+enum UserRole {
+  OWNER
+  FINANCE_MANAGER
+  VIEWER
+}
+
+model PasswordResetOtp {
+  id        String   @id @default(uuid())
+  email     String
+  otpHash   String
+  expiresAt DateTime
+  used      Boolean  @default(false)
+  createdAt DateTime @default(now())
+
+  @@index([email])
+}
+
+// ── Customers & VAs ────────────────────────────────────────────────
+model Customer {
+  id              String         @id @default(uuid())
+  organizationId  String
+  organization    Organization   @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  name            String
+  email           String?
+  phone           String?
+  customerCode    String
+  customerType    CustomerType   @default(RECURRING)
+  status          CustomerStatus @default(ACTIVE)
+  creditBalance   Decimal        @default(0) @db.Decimal(15, 2)
+  outstandingDebt Decimal        @default(0) @db.Decimal(15, 2)
+  notes           String?
+  createdAt       DateTime       @default(now())
+  updatedAt       DateTime       @updatedAt
+
+  virtualAccount  VirtualAccount?
+  invoices        Invoice[]
+  ledgerEntries   LedgerEntry[]
+
+  @@unique([organizationId, customerCode])
+  @@unique([organizationId, email])
+  @@index([organizationId, status])
+  @@index([organizationId, customerType])
+}
+
+enum CustomerType {
+  RECURRING
+  ONE_TIME
+}
+
+enum CustomerStatus {
+  ACTIVE
+  INACTIVE
+  SUSPENDED
+  PENDING_VA
+}
+
+model VirtualAccount {
+  id             String               @id @default(uuid())
+  customerId     String               @unique
+  customer       Customer             @relation(fields: [customerId], references: [id], onDelete: Cascade)
+  organizationId String
+  accountRef     String               @unique
+  accountNumber  String
+  accountName    String
+  bankName       String
+  nombaAccountId String
+  status         VirtualAccountStatus @default(ACTIVE)
+  createdAt      DateTime             @default(now())
+  updatedAt      DateTime             @updatedAt
+}
+
+enum VirtualAccountStatus {
+  ACTIVE
+  SUSPENDED
+  EXPIRED
+}
+
+// ── Invoices  ──────────────────────────────────────────────
+model Invoice {
+  id                String        @id @default(uuid())
+  invoiceNumber     String        @unique
+
+  organizationId    String
+  organization      Organization  @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+
+  customerId        String
+  customer          Customer      @relation(fields: [customerId], references: [id], onDelete: Cascade)
+
+  /// Customer's settlement sub-account
+  accountId         String?
+
+  status            InvoiceStatus @default(DRAFT)
+
+  totalAmount       Decimal       @db.Decimal(15, 2)
+  amountPaid        Decimal       @default(0) @db.Decimal(15, 2)
+  balanceDue        Decimal       @db.Decimal(15, 2)
+
+  currency          String        @default("NGN")
+
+  dueDate           DateTime
+  notes             String?
+
+  /// Nomba Checkout
+  checkoutLink      String?
+  orderReference    String?       @unique
+  checkoutExpiresAt DateTime?
+
+  sentAt            DateTime?
+  paidAt            DateTime?
+  cancelledAt       DateTime?
+  expiredAt         DateTime?
+
+  createdAt         DateTime      @default(now())
+  updatedAt         DateTime      @updatedAt
+
+  lineItems         LineItem[]
+  ledgerEntries     LedgerEntry[]
+
+  @@index([organizationId, status])
+  @@index([customerId, status])
+  @@index([orderReference])
+  @@index([accountId])
+}
+
+enum InvoiceStatus {
+  DRAFT
+  PENDING
+  PARTIALLY_PAID
+  PAID
+  OVERPAID
+  CANCELLED
+  EXPIRED
+}
+
+model LineItem {
+  id          String  @id @default(uuid())
+  invoiceId   String
+  invoice     Invoice @relation(fields: [invoiceId], references: [id], onDelete: Cascade)
+  description String
+  quantity    Decimal @db.Decimal(10, 2)
+  unitPrice   Decimal @db.Decimal(15, 2)
+  amount      Decimal @db.Decimal(15, 2)
+}
+
+// ── Ledger & Events ────────────────────────────────────────────────
+model LedgerEntry {
+  id                 String          @id @default(uuid())
+  organizationId     String
+  customerId         String
+  customer           Customer        @relation(fields: [customerId], references: [id], onDelete: Cascade)
+  invoiceId          String?
+  invoice            Invoice?        @relation(fields: [invoiceId], references: [id], onDelete: SetNull)
+  entryType          LedgerEntryType
+  debitAmount        Decimal         @db.Decimal(15, 2)
+  creditAmount       Decimal         @db.Decimal(15, 2)
+  runningBalance     Decimal         @db.Decimal(15, 2)
+  description        String
+  reference          String          @default("")
+  nombaTransactionId String?
+  postedAt           DateTime        @default(now())
+  createdBy          String          @default("SYSTEM")
+
+  @@index([organizationId, customerId, postedAt])
+  @@index([nombaTransactionId])
+  @@index([invoiceId])
+}
+
+enum LedgerEntryType {
+  INVOICE_CREATED
+  PAYMENT_RECEIVED
+  PARTIAL_PAYMENT
+  OVERPAYMENT
+  UNALLOCATED_CREDIT
+  CREDIT_APPLIED
+  ADJUSTMENT
+  REFUND_ISSUED
+}
+
+model WebhookEvent {
+  id                 String             @id @default(uuid())
+  organizationId     String?
+  organization       Organization?      @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  nombaTransactionId String             @unique
+  eventType          String
+  payload            Json
+  status             WebhookEventStatus @default(RECEIVED)
+  invoiceId          String?
+  customerId         String?
+  processedAt        DateTime?
+  errorMessage       String?
+  retryCount         Int                @default(0)
+  createdAt          DateTime           @default(now())
+  updatedAt          DateTime           @updatedAt
+
+  @@index([status, createdAt])
+  @@index([organizationId, createdAt])
+}
+
+enum WebhookEventStatus {
+  RECEIVED
+  PROCESSING
+  PROCESSED
+  FAILED
+  SUSPENSE
+}
+
+// ── Settings & Audit ──────────────────────────────────────────────
+
+model AuditLog {
+  id             String       @id @default(uuid())
+  organizationId String
+  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  userId         String?
+  action         String
+  entity         String
+  entityId       String
+  metadata       Json         @default("{}")
+  ipAddress      String?
+  userAgent      String?
+  createdAt      DateTime     @default(now())
+
+  @@index([organizationId, createdAt])
+  @@index([entity, entityId])
+  @@index([userId])
+}
