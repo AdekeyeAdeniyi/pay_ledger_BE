@@ -51,7 +51,7 @@ export async function buildApp(): Promise<FastifyInstance> {
 
   // Register Security Plugins
   await fastify.register(cors, {
-    origin: env.NODE_ENV === "production" ? ["https://payledger.io", "https://app.payledger.io"] : "http://localhost:3000",
+    origin: env.NODE_ENV === "production" ? ["https://pay-ledger-fe.onrender.com", "https://pay-ledger-fe.onrender.com"] : "http://localhost:3000",
     credentials: true,
     methods: ["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],
     exposedHeaders: ["Set-Cookie"],
