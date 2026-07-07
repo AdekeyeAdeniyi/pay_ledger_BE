@@ -49,13 +49,28 @@ export async function buildApp(): Promise<FastifyInstance> {
     }
   });
 
+  const allowedOrigins = ["http://localhost:3000", "http://localhost:5173", "https://pay-ledger-fe.onrender.com"];
+
   // Register Security Plugins
   await fastify.register(cors, {
-    origin: env.NODE_ENV === "production" ? ["https://pay-ledger-fe.onrender.com", "https://pay-ledger-fe.onrender.com"] : "http://localhost:3000",
+    origin(origin, cb) {
+      // Allow Postman/server-to-server requests
+      if (!origin) {
+        return cb(null, true);
+      }
+
+      if (allowedOrigins.includes(origin)) {
+        return cb(null, true);
+      }
+
+      cb(new Error("Origin not allowed"), false);
+    },
+
     credentials: true,
+
     methods: ["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],
-    exposedHeaders: ["Set-Cookie"],
-    allowedHeaders: ["Authorization", "Content-Type"],
+
+    allowedHeaders: ["Authorization", "Content-Type", "Accept"],
   });
 
   await fastify.register(helmet, {

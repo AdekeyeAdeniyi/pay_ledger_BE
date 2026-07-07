@@ -59,14 +59,6 @@ export async function authRoutes(fastify: FastifyInstance): Promise<void> {
     const refreshToken = randomUUID();
     await redis.setex(`refresh:${refreshToken}`, 86400 * env.REFRESH_TOKEN_TTL_DAYS, JSON.stringify({ userId: result.user.id, orgId: result.org.id }));
 
-    reply.setCookie("refresh_token", refreshToken, {
-      httpOnly: true,
-      secure: env.NODE_ENV === "production",
-      sameSite: env.NODE_ENV === "production" ? "none" : "lax",
-      path: "/",
-      maxAge: 86400 * env.REFRESH_TOKEN_TTL_DAYS,
-    });
-
     await queues.notifications.add("welcome-email", { email: result.user.email, name: result.user.name });
     await writeAuditLog({ organizationId: result.org.id, userId: result.user.id, action: "ORG_CREATED", entity: "Organization", entityId: result.org.id });
 
@@ -101,14 +93,6 @@ export async function authRoutes(fastify: FastifyInstance): Promise<void> {
     const refreshToken = randomUUID();
     await redis.setex(`refresh:${refreshToken}`, 86400 * env.REFRESH_TOKEN_TTL_DAYS, JSON.stringify({ userId: user.id, orgId: user.organizationId }));
 
-    reply.setCookie("refresh_token", refreshToken, {
-      httpOnly: true,
-      secure: env.NODE_ENV === "production",
-      sameSite: env.NODE_ENV === "production" ? "none" : "lax",
-      path: "/",
-      maxAge: 86400 * env.REFRESH_TOKEN_TTL_DAYS,
-    });
-
     await writeAuditLog({ organizationId: user.organizationId, userId: user.id, action: "USER_LOGIN", entity: "User", entityId: user.id });
 
     return { success: true, data: { access_token: accessToken, refresh_token: refreshToken, user: { id: user.id, name: user.name, email: user.email, role: user.role, orgId: user.organizationId } } };
@@ -134,15 +118,6 @@ export async function authRoutes(fastify: FastifyInstance): Promise<void> {
     await redis.del(`refresh:${refreshToken}`);
     const newRefresh = randomUUID();
     await redis.setex(`refresh:${newRefresh}`, 86400 * env.REFRESH_TOKEN_TTL_DAYS, JSON.stringify({ userId: user.id, orgId }));
-
-    reply.setCookie("refresh_token", newRefresh, {
-      httpOnly: true,
-      secure: env.NODE_ENV === "production",
-      sameSite: env.NODE_ENV === "production" ? "none" : "lax",
-      path: "/",
-      maxAge: 86400 * env.REFRESH_TOKEN_TTL_DAYS,
-    });
-
     const jti = randomUUID();
     const accessToken = jwt.sign({ sub: user.id, org: orgId, role: user.role, jti }, env.JWT_SECRET, { expiresIn: env.JWT_EXPIRES_IN as any });
 
