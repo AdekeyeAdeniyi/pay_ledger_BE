@@ -13,7 +13,6 @@ import { orgRoutes } from "./routes/org.routes";
 import { customerRoutes } from "./routes/customer.routes";
 import { invoiceRoutes } from "./routes/invoice.routes";
 import { webhookRoutes } from "./routes/webhook.routes";
-import { reportRoutes } from "./routes/report.routes";
 import { jsonSchemaTransform, serializerCompiler, validatorCompiler } from "fastify-type-provider-zod";
 import { registerBullBoard } from "./bull-board";
 import { transactionRoutes } from "./routes/transaction.routes";
@@ -170,7 +169,6 @@ export async function buildApp(): Promise<FastifyInstance> {
   await fastify.register(customerRoutes);
   await fastify.register(invoiceRoutes);
   await fastify.register(webhookRoutes);
-  await fastify.register(reportRoutes);
   await fastify.register(transactionRoutes);
 
   // Global Error Handler
