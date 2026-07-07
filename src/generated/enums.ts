@@ -45,6 +45,14 @@ export const VirtualAccountStatus = {
 export type VirtualAccountStatus = (typeof VirtualAccountStatus)[keyof typeof VirtualAccountStatus]
 
 
+export const PaymentPath = {
+  CHECKOUT: 'CHECKOUT',
+  BANK_TRANSFER: 'BANK_TRANSFER'
+} as const
+
+export type PaymentPath = (typeof PaymentPath)[keyof typeof PaymentPath]
+
+
 export const InvoiceStatus = {
   DRAFT: 'DRAFT',
   PENDING: 'PENDING',
@@ -61,12 +69,8 @@ export type InvoiceStatus = (typeof InvoiceStatus)[keyof typeof InvoiceStatus]
 export const LedgerEntryType = {
   INVOICE_CREATED: 'INVOICE_CREATED',
   PAYMENT_RECEIVED: 'PAYMENT_RECEIVED',
-  PARTIAL_PAYMENT: 'PARTIAL_PAYMENT',
-  OVERPAYMENT: 'OVERPAYMENT',
-  UNALLOCATED_CREDIT: 'UNALLOCATED_CREDIT',
-  CREDIT_APPLIED: 'CREDIT_APPLIED',
-  ADJUSTMENT: 'ADJUSTMENT',
-  REFUND_ISSUED: 'REFUND_ISSUED'
+  CUSTOMER_CREDIT_APPLIED: 'CUSTOMER_CREDIT_APPLIED',
+  CUSTOMER_CREDIT_CREATED: 'CUSTOMER_CREDIT_CREATED'
 } as const
 
 export type LedgerEntryType = (typeof LedgerEntryType)[keyof typeof LedgerEntryType]

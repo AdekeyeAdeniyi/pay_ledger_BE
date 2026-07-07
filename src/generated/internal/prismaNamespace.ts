@@ -1266,7 +1266,7 @@ export const VirtualAccountScalarFieldEnum = {
   accountNumber: 'accountNumber',
   accountName: 'accountName',
   bankName: 'bankName',
-  nombaAccountId: 'nombaAccountId',
+  accountHolderId: 'accountHolderId',
   status: 'status',
   createdAt: 'createdAt',
   updatedAt: 'updatedAt'
@@ -1281,6 +1281,7 @@ export const InvoiceScalarFieldEnum = {
   organizationId: 'organizationId',
   customerId: 'customerId',
   accountId: 'accountId',
+  accountRef: 'accountRef',
   status: 'status',
   totalAmount: 'totalAmount',
   amountPaid: 'amountPaid',
@@ -1291,6 +1292,7 @@ export const InvoiceScalarFieldEnum = {
   checkoutLink: 'checkoutLink',
   orderReference: 'orderReference',
   checkoutExpiresAt: 'checkoutExpiresAt',
+  paymentPath: 'paymentPath',
   sentAt: 'sentAt',
   paidAt: 'paidAt',
   cancelledAt: 'cancelledAt',
@@ -1530,6 +1532,20 @@ export type EnumInvoiceStatusFieldRefInput<$PrismaModel> = FieldRefInputType<$Pr
  * Reference to a field of type 'InvoiceStatus[]'
  */
 export type ListEnumInvoiceStatusFieldRefInput<$PrismaModel> = FieldRefInputType<$PrismaModel, 'InvoiceStatus[]'>
+    
+
+
+/**
+ * Reference to a field of type 'PaymentPath'
+ */
+export type EnumPaymentPathFieldRefInput<$PrismaModel> = FieldRefInputType<$PrismaModel, 'PaymentPath'>
+    
+
+
+/**
+ * Reference to a field of type 'PaymentPath[]'
+ */
+export type ListEnumPaymentPathFieldRefInput<$PrismaModel> = FieldRefInputType<$PrismaModel, 'PaymentPath[]'>
     
 
 

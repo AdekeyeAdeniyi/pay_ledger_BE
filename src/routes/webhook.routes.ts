@@ -4,6 +4,7 @@ import { NombaWebhookPayload, verifyNombaSignature } from "../utils/nombaWebhook
 import { queues } from "../queues";
 import { Prisma } from "../generated/client";
 import { env } from "../config/env";
+import { logger } from "../utils/logger";
 
 export async function webhookRoutes(fastify: FastifyInstance): Promise<void> {
   fastify.post<{ Params: { orgId: string } }>(
@@ -19,12 +20,10 @@ export async function webhookRoutes(fastify: FastifyInstance): Promise<void> {
       const { orgId } = request.params;
 
       const signature = request.headers["nomba-signature"] as string;
-      const signatureValue = request.headers["nomba-sig-value"] as string;
       const algorithm = request.headers["nomba-signature-algorithm"] as string;
-      const version = request.headers["nomba-signature-version"] as string;
       const timestamp = request.headers["nomba-timestamp"] as string;
 
-      if (!signature || !signatureValue || !algorithm || !version || !timestamp) {
+      if (!signature || !algorithm || !timestamp) {
         return reply.code(400).send({
           success: false,
           message: "Missing webhook headers",
@@ -37,6 +36,18 @@ export async function webhookRoutes(fastify: FastifyInstance): Promise<void> {
           message: "Unsupported signature algorithm",
         });
       }
+      const organization = await prisma.organization.findUnique({
+        where: {
+          id: orgId,
+        },
+      });
+
+      if (!organization) {
+        return reply.code(404).send({
+          success: false,
+          message: "Organization not found",
+        });
+      }
 
       const rawBody = (request as any).rawBody;
 
@@ -45,6 +56,7 @@ export async function webhookRoutes(fastify: FastifyInstance): Promise<void> {
       if (!valid) {
         return reply.code(401).send({
           success: false,
+          message: "Invalid webhook signature",
         });
       }
 
@@ -62,16 +74,15 @@ export async function webhookRoutes(fastify: FastifyInstance): Promise<void> {
 
       const transactionId = payload.data.transaction.transactionId;
 
-      const exists = await prisma.webhookEvent.findUnique({
+      const event = await prisma.webhookEvent.findUnique({
         where: {
           nombaTransactionId: transactionId,
         },
       });
 
-      if (exists?.status === "PROCESSED") {
-        return reply.send({
-          success: true,
-        });
+      if (event?.status === "PROCESSED") {
+        logger.info("Already processed");
+        return;
       }
 
       await prisma.webhookEvent.upsert({
@@ -92,16 +103,39 @@ export async function webhookRoutes(fastify: FastifyInstance): Promise<void> {
         },
       });
 
-      await queues.reconciliation.add(
-        "reconcile",
-        {
-          orgId,
-          payload,
-        },
-        {
-          jobId: transactionId,
-        },
-      );
+      try {
+        await queues.reconciliation.add(
+          "reconciliation",
+          {
+            orgId,
+            payload,
+          },
+          {
+            jobId: transactionId,
+            attempts: 5,
+            backoff: {
+              type: "exponential",
+              delay: 5000,
+            },
+            removeOnComplete: 1000,
+            removeOnFail: 1000,
+
+            deduplication: {
+              id: transactionId,
+            },
+          },
+        );
+      } catch (error) {
+        logger.error(
+          {
+            transactionId,
+            error,
+          },
+          "Failed to enqueue reconciliation job",
+        );
+
+        throw error;
+      }
 
       return reply.send({
         success: true,

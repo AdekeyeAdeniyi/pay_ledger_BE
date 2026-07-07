@@ -16,6 +16,7 @@ import { webhookRoutes } from "./routes/webhook.routes";
 import { reportRoutes } from "./routes/report.routes";
 import { jsonSchemaTransform, serializerCompiler, validatorCompiler } from "fastify-type-provider-zod";
 import { registerBullBoard } from "./bull-board";
+import { transactionRoutes } from "./routes/transaction.routes";
 
 export async function buildApp(): Promise<FastifyInstance> {
   const fastify = Fastify({
@@ -51,9 +52,10 @@ export async function buildApp(): Promise<FastifyInstance> {
 
   // Register Security Plugins
   await fastify.register(cors, {
-    origin: env.NODE_ENV === "production" ? ["https://payledger.io", "https://app.payledger.io"] : true,
+    origin: env.NODE_ENV === "production" ? ["https://payledger.io", "https://app.payledger.io"] : "http://localhost:3000",
     credentials: true,
     methods: ["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],
+    exposedHeaders: ["Set-Cookie"],
     allowedHeaders: ["Authorization", "Content-Type"],
   });
 
@@ -169,6 +171,7 @@ export async function buildApp(): Promise<FastifyInstance> {
   await fastify.register(invoiceRoutes);
   await fastify.register(webhookRoutes);
   await fastify.register(reportRoutes);
+  await fastify.register(transactionRoutes);
 
   // Global Error Handler
   fastify.setErrorHandler((error, request, reply) => {

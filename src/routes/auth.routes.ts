@@ -62,7 +62,7 @@ export async function authRoutes(fastify: FastifyInstance): Promise<void> {
     reply.setCookie("refresh_token", refreshToken, {
       httpOnly: true,
       secure: env.NODE_ENV === "production",
-      sameSite: "strict",
+      sameSite: env.NODE_ENV === "production" ? "none" : "lax",
       path: "/",
       maxAge: 86400 * env.REFRESH_TOKEN_TTL_DAYS,
     });
@@ -76,6 +76,7 @@ export async function authRoutes(fastify: FastifyInstance): Promise<void> {
         org: { id: result.org.id, name: result.org.name, slug: result.org.slug },
         user: { id: result.user.id, name: result.user.name, email: result.user.email, role: result.user.role },
         access_token: accessToken,
+        refresh_token: refreshToken,
       },
     };
   });
@@ -103,14 +104,14 @@ export async function authRoutes(fastify: FastifyInstance): Promise<void> {
     reply.setCookie("refresh_token", refreshToken, {
       httpOnly: true,
       secure: env.NODE_ENV === "production",
-      sameSite: "strict",
+      sameSite: env.NODE_ENV === "production" ? "none" : "lax",
       path: "/",
       maxAge: 86400 * env.REFRESH_TOKEN_TTL_DAYS,
     });
 
     await writeAuditLog({ organizationId: user.organizationId, userId: user.id, action: "USER_LOGIN", entity: "User", entityId: user.id });
 
-    return { success: true, data: { access_token: accessToken, user: { id: user.id, name: user.name, email: user.email, role: user.role, orgId: user.organizationId } } };
+    return { success: true, data: { access_token: accessToken, refresh_token: refreshToken, user: { id: user.id, name: user.name, email: user.email, role: user.role, orgId: user.organizationId } } };
   });
 
   fastify.post<{ Body: { refresh_token?: string } }>("/auth/refresh", { schema: { tags: ["Auth"], description: "Rotate access and refresh tokens" } }, async (request, reply) => {
@@ -137,7 +138,7 @@ export async function authRoutes(fastify: FastifyInstance): Promise<void> {
     reply.setCookie("refresh_token", newRefresh, {
       httpOnly: true,
       secure: env.NODE_ENV === "production",
-      sameSite: "strict",
+      sameSite: env.NODE_ENV === "production" ? "none" : "lax",
       path: "/",
       maxAge: 86400 * env.REFRESH_TOKEN_TTL_DAYS,
     });

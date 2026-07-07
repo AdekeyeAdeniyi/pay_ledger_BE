@@ -9,6 +9,7 @@ export const defaultJobOptions: JobsOptions = {
 };
 
 export const queues = {
+  createVirtualAccount: new Queue("create-virtual-account", { connection: redis as any, defaultJobOptions }),
   reconciliation: new Queue("reconciliation", { connection: redis as any, defaultJobOptions }),
   notifications: new Queue("notifications", { connection: redis as any, defaultJobOptions }),
   reports: new Queue("reports", { connection: redis as any, defaultJobOptions }),

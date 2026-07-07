@@ -6,7 +6,6 @@ import { authenticateJWT, requireRole } from "../middleware/auth.middleware";
 import { writeAuditLog } from "../services/audit.service";
 import { CreateInvoiceSchema, GeneratePaymentOptionsSchema } from "../schemas/invoice.schema";
 import { AppError } from "../utils/errors";
-import { postLedgerEntryDirect } from "../services/ledger.service";
 import { env } from "../config/env";
 import { InvoiceStatus, Prisma } from "../generated/client";
 import { createNombaCheckoutOrder } from "../services/nomba.service";
@@ -357,17 +356,19 @@ export async function invoiceRoutes(fastify: FastifyInstance): Promise<void> {
         },
       });
 
-      if (!customer) throw new AppError("CUSTOMER_NOT_FOUND", "Customer not found in organization", 404);
+      if (!customer) {
+        throw new AppError("CUSTOMER_NOT_FOUND", "Customer not found in organization", 404);
+      }
 
       const totalAmount = body.lineItems.reduce((sum, item) => sum.add(new Prisma.Decimal(item.quantity).mul(new Prisma.Decimal(item.unitPrice))), new Prisma.Decimal(0));
 
       const dueDate = new Date(body.dueDate);
 
       const date = new Date().toISOString().slice(0, 10).replace(/-/g, "");
-      const random = crypto.randomUUID().split("-")[0].toUpperCase(); // e.g. A3F9C1D2
+
+      const random = crypto.randomUUID().split("-")[0].toUpperCase();
 
       const invoiceNumber = `INV-${date}-${random}`;
-
       const invoiceId = crypto.randomUUID();
 
       const invoiceData: Prisma.InvoiceUncheckedCreateInput = {
@@ -375,13 +376,22 @@ export async function invoiceRoutes(fastify: FastifyInstance): Promise<void> {
         invoiceNumber,
         organizationId: orgId,
         customerId: customer.id,
+
         status: "PENDING",
+
         totalAmount,
+        amountPaid: new Prisma.Decimal(0),
         balanceDue: totalAmount,
+
         dueDate,
-        orderReference: customer.virtualAccount?.accountRef || null,
-        accountId: customer.virtualAccount?.id ? null : env.NOMBA_SUB_ACCOUNT_ID,
         notes: body.notes,
+
+        paymentPath: customer.virtualAccount ? "BANK_TRANSFER" : "CHECKOUT",
+
+        accountRef: customer.virtualAccount?.accountRef ?? null,
+        accountId: customer.virtualAccount ? null : env.NOMBA_SUB_ACCOUNT_ID,
+
+        orderReference: null,
 
         lineItems: {
           create: body.lineItems.map((item) => ({
@@ -394,32 +404,97 @@ export async function invoiceRoutes(fastify: FastifyInstance): Promise<void> {
       };
 
       const invoice = await prisma.$transaction(async (tx) => {
+        const freshCustomer = await tx.customer.findUniqueOrThrow({
+          where: { id: customer.id },
+          select: { creditBalance: true, outstandingDebt: true },
+        });
+
         const inv = await tx.invoice.create({
           data: invoiceData,
-          include: { lineItems: true },
+          include: {
+            customer: true,
+            lineItems: true,
+          },
         });
+
+        const totalAmount = new Prisma.Decimal(inv.totalAmount);
+        let remainingInvoiceBalance = totalAmount;
+        let runningCustomerDebt = freshCustomer.outstandingDebt.add(totalAmount);
+        let runningCustomerCredit = freshCustomer.creditBalance;
+
+        await tx.ledgerEntry.create({
+          data: {
+            organizationId: orgId,
+            customerId: customer.id,
+            invoiceId: inv.id,
+            entryType: "INVOICE_CREATED",
+            debitAmount: totalAmount,
+            creditAmount: new Prisma.Decimal(0),
+            runningBalance: runningCustomerDebt.sub(runningCustomerCredit),
+            reference: `INV_${invoiceNumber}`,
+            description: `Invoice ${invoiceNumber} created`,
+          },
+        });
+
+        let creditApplied = new Prisma.Decimal(0);
+
+        if (runningCustomerCredit.gt(0)) {
+          creditApplied = Prisma.Decimal.min(remainingInvoiceBalance, runningCustomerCredit);
+          remainingInvoiceBalance = remainingInvoiceBalance.sub(creditApplied);
+
+          runningCustomerCredit = runningCustomerCredit.sub(creditApplied);
+          runningCustomerDebt = runningCustomerDebt.sub(creditApplied);
+
+          await tx.ledgerEntry.create({
+            data: {
+              organizationId: orgId,
+              customerId: customer.id,
+              invoiceId: inv.id,
+              entryType: "CUSTOMER_CREDIT_APPLIED",
+              debitAmount: new Prisma.Decimal(0),
+              creditAmount: creditApplied,
+              runningBalance: runningCustomerDebt.sub(runningCustomerCredit),
+              reference: `CR_APP_${invoiceNumber}`,
+              description: `Applied internal wallet credit balance to invoice ${invoiceNumber}`,
+            },
+          });
+        }
+
+        if (creditApplied.gt(0)) {
+          await tx.invoice.update({
+            where: { id: inv.id },
+            data: {
+              amountPaid: creditApplied,
+              balanceDue: remainingInvoiceBalance,
+              status: remainingInvoiceBalance.eq(0) ? "PAID" : "PARTIALLY_PAID",
+              paidAt: remainingInvoiceBalance.eq(0) ? new Date() : null,
+            },
+          });
+        }
 
         await tx.customer.update({
           where: { id: customer.id },
-          data: { outstandingDebt: { increment: totalAmount } },
+          data: {
+            outstandingDebt: runningCustomerDebt,
+            creditBalance: runningCustomerCredit,
+          },
         });
 
         return inv;
       });
 
-      await postLedgerEntryDirect({
-        type: "INVOICE_CREATED",
+      await writeAuditLog({
         organizationId: orgId,
-        customerId: customer.id,
-        invoiceId: invoice.id,
-        debitAmount: totalAmount,
-        creditAmount: new Prisma.Decimal(0),
-        description: `Invoice ${invoiceNumber} created for ₦${totalAmount}`,
-        reference: invoiceNumber,
+        userId: request.user!.sub,
+        action: "INVOICE_CREATED",
+        entity: "Invoice",
+        entityId: invoice.id,
       });
 
-      await writeAuditLog({ organizationId: orgId, userId: request.user!.sub, action: "INVOICE_CREATED", entity: "Invoice", entityId: invoice.id });
-      return { success: true, data: null };
+      return {
+        success: true,
+        data: invoice,
+      };
     },
   );
 

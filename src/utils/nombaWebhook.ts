@@ -9,6 +9,8 @@ export interface NombaWebhookPayload {
     terminal?: NombaTerminal;
     transaction: NombaTransaction;
     customer: NombaCustomer;
+    order?: NombaOrder;
+    tokenizedCardData?: NombaTokenizedCardData;
   };
 }
 
@@ -30,11 +32,12 @@ export interface NombaTransaction {
   aliasAccountType?: "VIRTUAL";
   fee: number;
   sessionId?: string;
-  type: "vact_transfer" | "purchase" | "checkout";
+  type: "vact_transfer" | "online_checkout" | "purchase" | "withdrawal" | (string & {});
   transactionId: string;
   responseCode?: string;
   responseCodeMessage?: string;
-  originatingFrom: "api" | "pos" | string;
+  originatingFrom: "api" | "pos" | "web" | string;
+  merchantTxRef?: string;
   transactionAmount: number;
   narration?: string;
   time: string;
@@ -49,9 +52,32 @@ export interface NombaCustomer {
   bankCode?: string;
   bankName?: string;
   accountNumber?: string;
-
   productId?: string;
+  billerId?: string;
+  cardPan?: string;
+}
 
+export interface NombaOrder {
+  amount: number;
+  orderId: string;
+  orderReference: string;
+  cardType?: string;
+  cardLast4Digits?: string;
+  cardCurrency?: string;
+  accountId?: string;
+  customerEmail?: string;
+  customerId?: string;
+  isTokenizedCardPayment?: string;
+  paymentMethod?: string;
+  callbackUrl?: string;
+  currency?: string;
+}
+
+export interface NombaTokenizedCardData {
+  tokenKey?: string;
+  cardType?: string;
+  tokenExpiryYear?: string;
+  tokenExpiryMonth?: string;
   cardPan?: string;
 }
 

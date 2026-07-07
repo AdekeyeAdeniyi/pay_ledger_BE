@@ -9,25 +9,25 @@ datasource db {
 
 // ── Auth & Org ─────────────────────────────────────────────────────
 model Organization {
-  id                     String         @id @default(uuid())
-  name                   String
-  slug                   String         @unique
-  email                  String         @unique
-  phone                  String?
-  logoUrl                String?
-  whatsappNumber         String?
-  notifyOnPayment        Boolean        @default(true)
-  notifyDailySummary     Boolean        @default(true)
-  notifyWeeklySummary    Boolean        @default(true)
-  nombaAccountId         String?
-  createdAt              DateTime       @default(now())
-  updatedAt              DateTime       @updatedAt
+  id                  String   @id @default(uuid())
+  name                String
+  slug                String   @unique
+  email               String   @unique
+  phone               String?
+  logoUrl             String?
+  whatsappNumber      String?
+  notifyOnPayment     Boolean  @default(true)
+  notifyDailySummary  Boolean  @default(true)
+  notifyWeeklySummary Boolean  @default(true)
+  nombaAccountId      String?
+  createdAt           DateTime @default(now())
+  updatedAt           DateTime @updatedAt
 
-  users                  User[]
-  customers              Customer[]
-  invoices               Invoice[]
-  auditLogs              AuditLog[]
-  webhookEvents          WebhookEvent[]
+  users           User[]
+  customers       Customer[]
+  invoices        Invoice[]
+  auditLogs       AuditLog[]
+  webhookEvents   WebhookEvent[]
 }
 
 model User {
@@ -72,8 +72,8 @@ model Customer {
   customerCode    String
   customerType    CustomerType   @default(RECURRING)
   status          CustomerStatus @default(ACTIVE)
-  creditBalance   Decimal        @default(0) @db.Decimal(15, 2)
-  outstandingDebt Decimal        @default(0) @db.Decimal(15, 2)
+  creditBalance   Decimal        @default(0) @db.Decimal(18, 2)
+  outstandingDebt Decimal        @default(0) @db.Decimal(18, 2)
   notes           String?
   createdAt       DateTime       @default(now())
   updatedAt       DateTime       @updatedAt
@@ -88,6 +88,8 @@ model Customer {
   @@index([organizationId, customerType])
 }
 
+
+
 enum CustomerType {
   RECURRING
   ONE_TIME
@@ -101,18 +103,18 @@ enum CustomerStatus {
 }
 
 model VirtualAccount {
-  id             String               @id @default(uuid())
-  customerId     String               @unique
-  customer       Customer             @relation(fields: [customerId], references: [id], onDelete: Cascade)
-  organizationId String
-  accountRef     String               @unique
-  accountNumber  String
-  accountName    String
-  bankName       String
-  nombaAccountId String
-  status         VirtualAccountStatus @default(ACTIVE)
-  createdAt      DateTime             @default(now())
-  updatedAt      DateTime             @updatedAt
+  id              String               @id @default(uuid())
+  customerId      String               @unique
+  customer        Customer             @relation(fields: [customerId], references: [id], onDelete: Cascade)
+  organizationId  String
+  accountRef      String               @unique
+  accountNumber   String
+  accountName     String
+  bankName        String
+  accountHolderId String
+  status          VirtualAccountStatus @default(ACTIVE)
+  createdAt       DateTime             @default(now())
+  updatedAt       DateTime             @updatedAt
 }
 
 enum VirtualAccountStatus {
@@ -121,46 +123,54 @@ enum VirtualAccountStatus {
   EXPIRED
 }
 
+enum PaymentPath {
+  CHECKOUT
+  BANK_TRANSFER
+}
+
 // ── Invoices  ──────────────────────────────────────────────
 model Invoice {
-  id                String        @id @default(uuid())
-  invoiceNumber     String        @unique
+  id            String @id @default(uuid())
+  invoiceNumber String @unique
 
-  organizationId    String
-  organization      Organization  @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  organizationId String
+  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
 
-  customerId        String
-  customer          Customer      @relation(fields: [customerId], references: [id], onDelete: Cascade)
+  customerId String
+  customer   Customer @relation(fields: [customerId], references: [id], onDelete: Cascade)
 
   /// Customer's settlement sub-account
-  accountId         String?
+  accountId  String?
+  accountRef String?
 
-  status            InvoiceStatus @default(DRAFT)
+  status InvoiceStatus @default(DRAFT)
 
-  totalAmount       Decimal       @db.Decimal(15, 2)
-  amountPaid        Decimal       @default(0) @db.Decimal(15, 2)
-  balanceDue        Decimal       @db.Decimal(15, 2)
+  totalAmount Decimal @db.Decimal(15, 2)
+  amountPaid  Decimal @default(0) @db.Decimal(15, 2)
+  balanceDue  Decimal @db.Decimal(15, 2)
 
-  currency          String        @default("NGN")
+  currency String @default("NGN")
 
-  dueDate           DateTime
-  notes             String?
+  dueDate DateTime
+  notes   String?
 
   /// Nomba Checkout
   checkoutLink      String?
-  orderReference    String?       @unique
+  orderReference    String?   @unique
   checkoutExpiresAt DateTime?
 
-  sentAt            DateTime?
-  paidAt            DateTime?
-  cancelledAt       DateTime?
-  expiredAt         DateTime?
+  paymentPath PaymentPath? @default(CHECKOUT)
 
-  createdAt         DateTime      @default(now())
-  updatedAt         DateTime      @updatedAt
+  sentAt      DateTime?
+  paidAt      DateTime?
+  cancelledAt DateTime?
+  expiredAt   DateTime?
 
-  lineItems         LineItem[]
-  ledgerEntries     LedgerEntry[]
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  lineItems     LineItem[]
+  ledgerEntries LedgerEntry[]
 
   @@index([organizationId, status])
   @@index([customerId, status])
@@ -201,7 +211,7 @@ model LedgerEntry {
   creditAmount       Decimal         @db.Decimal(15, 2)
   runningBalance     Decimal         @db.Decimal(15, 2)
   description        String
-  reference          String          @default("")
+  reference          String          @unique
   nombaTransactionId String?
   postedAt           DateTime        @default(now())
   createdBy          String          @default("SYSTEM")
@@ -214,12 +224,8 @@ model LedgerEntry {
 enum LedgerEntryType {
   INVOICE_CREATED
   PAYMENT_RECEIVED
-  PARTIAL_PAYMENT
-  OVERPAYMENT
-  UNALLOCATED_CREDIT
-  CREDIT_APPLIED
-  ADJUSTMENT
-  REFUND_ISSUED
+  CUSTOMER_CREDIT_APPLIED
+  CUSTOMER_CREDIT_CREATED
 }
 
 model WebhookEvent {

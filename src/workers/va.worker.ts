@@ -8,15 +8,13 @@ import { writeAuditLog } from "../services/audit.service";
 
 export function startVaWorker() {
   const worker = new Worker(
-    "reconciliation",
+    "create-virtual-account",
     async (job) => {
       if (job.name !== "create-virtual-account") return;
 
-      const { orgId, customerId, customerName, email, phone } = job.data;
+      const { orgId, customerId, customerName, email, phone, accountRef } = job.data;
 
       logger.info({ customerId }, "Processing create-virtual-account job");
-
-      const accountRef = `REC-${orgId}-${customerId}`;
 
       try {
         const vaData = await createNombaVirtualAccount({
@@ -36,7 +34,7 @@ export function startVaWorker() {
               accountNumber: vaData.bankAccountNumber,
               accountName: vaData.bankAccountName,
               bankName: vaData.bankName,
-              nombaAccountId: vaData.id || "nomba_acc_" + Math.random().toString(36).substring(7),
+              accountHolderId: vaData.accountHolderId,
               status: "ACTIVE",
             },
           });

@@ -8,7 +8,7 @@ export interface NombaVirtualAccountData {
   bankAccountNumber: string;
   bankAccountName: string;
   bankName: string;
-  id: string;
+  accountHolderId: string;
 }
 
 const sleep = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
@@ -172,7 +172,7 @@ export async function createNombaVirtualAccount(params: {
       bankAccountNumber: "9" + Math.floor(100000000 + Math.random() * 900000000).toString(),
       bankAccountName: params.accountName,
       bankName: "Nomba MFB",
-      id: "nomba_acc_" + Math.random().toString(36).substring(7),
+      accountHolderId: "nomba_acc_" + Math.random().toString(36).substring(7),
     };
   }
 
@@ -250,76 +250,5 @@ export async function createNombaCheckoutOrder(params: {
   if (json.code !== "00" || !json.data) {
     throw new AppError("NOMBA_TRANSFER_FAILED", json.description || "Nomba checkout order failed", 502, json);
   }
-  return json.data;
-}
-
-export async function verifyNombaTransactionSingle(transactionId: string): Promise<NombaTransactionData | null> {
-  const token = await nombaTokenService.getAccessToken().catch(() => "mock_token");
-
-  if (token === "mock_token" || env.NOMBA_CLIENT_ID.includes("sandbox")) {
-    return {
-      status: "success",
-      transactionId,
-      type: "vact_transfer",
-      time: new Date().toISOString(),
-      transactionAmount: 10000,
-    };
-  }
-
-  const res = await fetch(`${env.NOMBA_BASE_URL}/v1/transactions/accounts/single?transactionId=${transactionId}`, {
-    headers: {
-      Authorization: `Bearer ${token}`,
-      accountId: env.NOMBA_SUB_ACCOUNT_ID,
-    },
-  });
-
-  const json = (await res.json()) as NombaApiResponse<NombaTransactionData>;
-  if (json.code !== "00" || !json.data) return null;
-  return json.data;
-}
-
-export async function getNombaSubAccountDetails(accountId: string): Promise<NombaSubAccountDetails> {
-  const token = await nombaTokenService.getAccessToken().catch(() => "mock_token");
-
-  if (token === "mock_token" || env.NOMBA_CLIENT_ID.includes("sandbox")) {
-    logger.info({ accountId }, "Simulating Fetch Sub Account Details");
-
-    return {
-      createdAt: new Date().toISOString(),
-      accountId,
-      accountHolderId: env.NOMBA_MAIN_ACCOUNT_ID,
-      accountRef: "MOCK-ACCOUNT",
-      bvn: "12345678901",
-      status: "ACTIVE",
-      accountName: "Mock Sub Account",
-      currency: "NGN",
-      banks: [
-        {
-          bankAccountNumber: "4211920177",
-          bankName: "Nombank MFB",
-          bankAccountName: "Mock Sub Account",
-        },
-      ],
-    };
-  }
-
-  const url = new URL(`${env.NOMBA_BASE_URL}/v1/accounts/sub-account-details`);
-  url.searchParams.set("accountId", accountId);
-
-  const res = await fetch(url.toString(), {
-    method: "GET",
-    headers: {
-      Authorization: `Bearer ${token}`,
-      "Content-Type": "application/json",
-      accountId: env.NOMBA_MAIN_ACCOUNT_ID,
-    },
-  });
-
-  const json = (await res.json()) as NombaApiResponse<NombaSubAccountDetails>;
-
-  if (json.code !== "00" || !json.data) {
-    throw new AppError("NOMBA_SUB_ACCOUNT_FETCH_FAILED", json.description || "Failed to fetch sub account details", 502, json);
-  }
-
   return json.data;
 }

@@ -24,9 +24,8 @@ export async function customerRoutes(fastify: FastifyInstance): Promise<void> {
       }
 
       const org = await prisma.organization.findUnique({ where: { id: orgId } });
-      const count = await prisma.customer.count({ where: { organizationId: orgId } });
-      const seq = (count + 1).toString().padStart(4, "0");
-      const customerCode = `CUST-${org!.slug.slice(0, 8).toUpperCase()}-${seq}`;
+      const randomHex = Math.floor(1000 + Math.random() * 9000);
+      const customerCode = `CUST-${org!.slug.slice(0, 12).toUpperCase()}-${randomHex}`;
 
       const customerType = body.customerType as CustomerType;
       const status: CustomerStatus = customerType === "RECURRING" ? "PENDING_VA" : "ACTIVE";
@@ -45,17 +44,18 @@ export async function customerRoutes(fastify: FastifyInstance): Promise<void> {
       });
 
       if (customerType === "RECURRING") {
-        await queues.reconciliation.add("create-virtual-account", {
+        await queues.createVirtualAccount.add("create-virtual-account", {
           orgId,
           customerId: customer.id,
           customerName: customer.name,
           email: customer.email,
           phone: customer.phone,
+          accountRef: customer.customerCode,
         });
       }
 
       await writeAuditLog({ organizationId: orgId, userId: request.user!.sub, action: "CUSTOMER_CREATED", entity: "Customer", entityId: customer.id });
-      return { success: true, data: customer };
+      return { success: true, data: [] };
     },
   );
 
@@ -96,11 +96,14 @@ export async function customerRoutes(fastify: FastifyInstance): Promise<void> {
   );
 
   fastify.get<{ Params: { id: string } }>("/customers/:id", { schema: { tags: ["Customers"], description: "Retrieve specific customer profile and virtual account" } }, async (request) => {
+    const customerId = request.params.id;
+    const orgId = request.user!.org;
     const customer = await prisma.customer.findFirst({
-      where: { id: request.params.id, organizationId: request.user!.org },
+      where: { id: customerId, organizationId: orgId },
       include: { virtualAccount: true },
     });
     if (!customer) throw new AppError("CUSTOMER_NOT_FOUND", "Customer not found", 404);
+
     return { success: true, data: customer };
   });
 

@@ -312,6 +312,7 @@ export type LedgerEntryOrderByWithRelationInput = {
 
 export type LedgerEntryWhereUniqueInput = Prisma.AtLeast<{
   id?: string
+  reference?: string
   AND?: Prisma.LedgerEntryWhereInput | Prisma.LedgerEntryWhereInput[]
   OR?: Prisma.LedgerEntryWhereInput[]
   NOT?: Prisma.LedgerEntryWhereInput | Prisma.LedgerEntryWhereInput[]
@@ -323,13 +324,12 @@ export type LedgerEntryWhereUniqueInput = Prisma.AtLeast<{
   creditAmount?: Prisma.DecimalFilter<"LedgerEntry"> | runtime.Decimal | runtime.DecimalJsLike | number | string
   runningBalance?: Prisma.DecimalFilter<"LedgerEntry"> | runtime.Decimal | runtime.DecimalJsLike | number | string
   description?: Prisma.StringFilter<"LedgerEntry"> | string
-  reference?: Prisma.StringFilter<"LedgerEntry"> | string
   nombaTransactionId?: Prisma.StringNullableFilter<"LedgerEntry"> | string | null
   postedAt?: Prisma.DateTimeFilter<"LedgerEntry"> | Date | string
   createdBy?: Prisma.StringFilter<"LedgerEntry"> | string
   customer?: Prisma.XOR<Prisma.CustomerScalarRelationFilter, Prisma.CustomerWhereInput>
   invoice?: Prisma.XOR<Prisma.InvoiceNullableScalarRelationFilter, Prisma.InvoiceWhereInput> | null
-}, "id">
+}, "id" | "reference">
 
 export type LedgerEntryOrderByWithAggregationInput = {
   id?: Prisma.SortOrder
@@ -379,7 +379,7 @@ export type LedgerEntryCreateInput = {
   creditAmount: runtime.Decimal | runtime.DecimalJsLike | number | string
   runningBalance: runtime.Decimal | runtime.DecimalJsLike | number | string
   description: string
-  reference?: string
+  reference: string
   nombaTransactionId?: string | null
   postedAt?: Date | string
   createdBy?: string
@@ -397,7 +397,7 @@ export type LedgerEntryUncheckedCreateInput = {
   creditAmount: runtime.Decimal | runtime.DecimalJsLike | number | string
   runningBalance: runtime.Decimal | runtime.DecimalJsLike | number | string
   description: string
-  reference?: string
+  reference: string
   nombaTransactionId?: string | null
   postedAt?: Date | string
   createdBy?: string
@@ -445,7 +445,7 @@ export type LedgerEntryCreateManyInput = {
   creditAmount: runtime.Decimal | runtime.DecimalJsLike | number | string
   runningBalance: runtime.Decimal | runtime.DecimalJsLike | number | string
   description: string
-  reference?: string
+  reference: string
   nombaTransactionId?: string | null
   postedAt?: Date | string
   createdBy?: string
@@ -647,7 +647,7 @@ export type LedgerEntryCreateWithoutCustomerInput = {
   creditAmount: runtime.Decimal | runtime.DecimalJsLike | number | string
   runningBalance: runtime.Decimal | runtime.DecimalJsLike | number | string
   description: string
-  reference?: string
+  reference: string
   nombaTransactionId?: string | null
   postedAt?: Date | string
   createdBy?: string
@@ -663,7 +663,7 @@ export type LedgerEntryUncheckedCreateWithoutCustomerInput = {
   creditAmount: runtime.Decimal | runtime.DecimalJsLike | number | string
   runningBalance: runtime.Decimal | runtime.DecimalJsLike | number | string
   description: string
-  reference?: string
+  reference: string
   nombaTransactionId?: string | null
   postedAt?: Date | string
   createdBy?: string
@@ -722,7 +722,7 @@ export type LedgerEntryCreateWithoutInvoiceInput = {
   creditAmount: runtime.Decimal | runtime.DecimalJsLike | number | string
   runningBalance: runtime.Decimal | runtime.DecimalJsLike | number | string
   description: string
-  reference?: string
+  reference: string
   nombaTransactionId?: string | null
   postedAt?: Date | string
   createdBy?: string
@@ -738,7 +738,7 @@ export type LedgerEntryUncheckedCreateWithoutInvoiceInput = {
   creditAmount: runtime.Decimal | runtime.DecimalJsLike | number | string
   runningBalance: runtime.Decimal | runtime.DecimalJsLike | number | string
   description: string
-  reference?: string
+  reference: string
   nombaTransactionId?: string | null
   postedAt?: Date | string
   createdBy?: string
@@ -779,7 +779,7 @@ export type LedgerEntryCreateManyCustomerInput = {
   creditAmount: runtime.Decimal | runtime.DecimalJsLike | number | string
   runningBalance: runtime.Decimal | runtime.DecimalJsLike | number | string
   description: string
-  reference?: string
+  reference: string
   nombaTransactionId?: string | null
   postedAt?: Date | string
   createdBy?: string
@@ -839,7 +839,7 @@ export type LedgerEntryCreateManyInvoiceInput = {
   creditAmount: runtime.Decimal | runtime.DecimalJsLike | number | string
   runningBalance: runtime.Decimal | runtime.DecimalJsLike | number | string
   description: string
-  reference?: string
+  reference: string
   nombaTransactionId?: string | null
   postedAt?: Date | string
   createdBy?: string
