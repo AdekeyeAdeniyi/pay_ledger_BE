@@ -24,7 +24,9 @@ export async function orgRoutes(fastify: FastifyInstance): Promise<void> {
         prisma.ledgerEntry.aggregate({
           where: {
             organizationId: orgId,
-            entryType: "PAYMENT_RECEIVED",
+            entryType: {
+              in: ["PAYMENT_RECEIVED", "CUSTOMER_CREDIT_APPLIED"],
+            },
           },
           _sum: {
             creditAmount: true,
